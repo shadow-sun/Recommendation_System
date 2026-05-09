@@ -1,0 +1,22 @@
+{
+  "user_id": "u1",
+  "latency_ms": 169.70840000431053,
+  "first_count": 20,
+  "second_count": 20,
+  "negative_category": "food",
+  "negative_category_before": 8,
+  "negative_category_after": 0,
+  "ils": 0.030919608731729616,
+  "metrics": {
+    "users": 79,
+    "items": 153,
+    "requests": 2,
+    "feedback": 1,
+    "strategy": {
+      "name": "default",
+      "lambda": 0.7,
+      "explore_ratio": 0.1,
+      "negative_penalty": 0.5
+    }
+  }
+}
