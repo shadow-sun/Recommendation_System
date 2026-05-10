@@ -1,1 +1,0 @@
-INFO:     127.0.0.1:1931 - "GET /recommend?user_id=u1&k=3 HTTP/1.1" 200 OK
