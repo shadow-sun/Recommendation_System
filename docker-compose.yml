@@ -13,13 +13,29 @@ services:
       retries: 5
     restart: unless-stopped
 
-  api:
+  api-kuailive:
     build:
       context: .
-      dockerfile: docker/Dockerfile.api
-    container_name: recsys-api
+      dockerfile: docker/Dockerfile.kuailive
+    container_name: recsys-kuailive
     ports:
-      - "3000:3000"
+      - "3001:3001"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api-ml100k:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ml100k
+    container_name: recsys-ml100k
+    ports:
+      - "3002:3002"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
