@@ -30,6 +30,7 @@ class FeatureConfig:
 
 @dataclass
 class ModelConfig:
+    default_training_route: str = "two_tower_pointwise"
     embedding_dim: int = 64
     category_embedding_dim: int = 16
     hidden_units: List[int] = field(default_factory=lambda: [128, 64])

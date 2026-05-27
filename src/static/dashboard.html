@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电影推荐系统 - 管理控制台</title>
+<style>
+:root {
+  --bg: #f0f2f5; --card: #fff; --sidebar: #1e293b; --primary: #6366f1;
+  --text: #1e293b; --text2: #64748b; --border: #e2e8f0; --danger: #ef4444;
+  --success: #22c55e; --warning: #f59e0b; --radius: 10px; --shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--text); display:flex; min-height:100vh; }
+.sidebar { width:240px; background:var(--sidebar); color:#fff; padding:24px 0; display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:100; }
+.sidebar h1 { font-size:15px; padding:0 20px 20px; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+.sidebar .user-info { padding:12px 20px; font-size:12px; color:rgba(255,255,255,.5); border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:4px; }
+.sidebar .user-info strong { color:rgba(255,255,255,.85); display:block; font-size:13px; }
+.sidebar nav { flex:1; }
+.sidebar nav a { display:flex; align-items:center; gap:10px; padding:12px 20px; color:rgba(255,255,255,.6); text-decoration:none; font-size:14px; transition:.15s; border-left:3px solid transparent; }
+.sidebar nav a:hover, .sidebar nav a.active { color:#fff; background:rgba(255,255,255,.05); border-left-color:var(--primary); }
+.sidebar .logout-btn { margin:12px 20px; padding:8px 16px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.6); border:none; border-radius:6px; cursor:pointer; font-size:13px; text-align:center; width:calc(100% - 40px); }
+.sidebar .logout-btn:hover { background:rgba(255,255,255,.15); color:#fff; }
+.main { margin-left:240px; flex:1; padding:28px 32px; overflow-y:auto; }
+.page { display:none; }
+.page.active { display:block; }
+h2 { font-size:20px; margin-bottom:20px; }
+.cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:14px; margin-bottom:20px; }
+.card { background:var(--card); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); border:1px solid var(--border); }
+.card h3 { font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.card .value { font-size:28px; font-weight:700; }
+.card .value.green { color:var(--success); }
+.card .value.red { color:var(--danger); }
+.card .value.blue { color:var(--primary); }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; font-weight:600; margin-bottom:4px; color:var(--text2); }
+.form-group input, .form-group select { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:7px; font-size:14px; }
+.form-group input:focus, .form-group select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+.btn { padding:10px 18px; border:none; border-radius:7px; font-size:14px; font-weight:600; cursor:pointer; transition:.15s; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-primary:hover { opacity:.85; }
+.btn-sm { padding:5px 12px; font-size:12px; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-danger:hover { opacity:.85; }
+.btn-success { background:var(--success); color:#fff; }
+.btn-outline { background:transparent; border:1px solid var(--border); }
+.btn-outline:hover { background:var(--bg); }
+.flex { display:flex; gap:10px; align-items:center; }
+.flex-between { display:flex; justify-content:space-between; align-items:center; }
+.mb { margin-bottom:14px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); }
+th { font-size:12px; color:var(--text2); font-weight:600; background:var(--bg); }
+.rec-card { display:flex; gap:14px; padding:14px; background:var(--card); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:10px; align-items:center; }
+.rec-card .rank { width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0; }
+.rec-card .info { flex:1; }
+.rec-card .info .title { font-weight:600; font-size:14px; }
+.rec-card .info .meta { font-size:12px; color:var(--text2); }
+.rec-card .score { font-size:12px; font-weight:600; color:var(--primary); }
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge-green { background:#dcfce7; color:#166534; }
+.badge-yellow { background:#fef9c3; color:#854d0e; }
+.badge-red { background:#fee2e2; color:#991b1b; }
+.badge-blue { background:#dbeafe; color:#1e40af; }
+.log-line { font-family:Consolas,monospace; font-size:12px; padding:3px 0; border-bottom:1px solid var(--border); }
+.log-line.warn { color:var(--warning); }
+.log-line.error { color:var(--danger); }
+.log-line.info { color:var(--success); }
+pre { background:#1e293b; color:#e2e8f0; padding:14px; border-radius:7px; font-size:12px; overflow-x:auto; max-height:280px; overflow-y:auto; }
+.spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .6s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.toast { position:fixed; top:20px; right:20px; padding:12px 20px; border-radius:7px; color:#fff; font-size:13px; z-index:1000; transition:.3s; }
+.toast.success { background:var(--success); }
+.toast.error { background:var(--danger); }
+.empty { text-align:center; padding:36px; color:var(--text2); }
+.auth-page { display:flex; justify-content:center; align-items:center; min-height:100vh; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
+.auth-card { background:#fff; border-radius:var(--radius); padding:36px; width:380px; box-shadow:0 20px 60px rgba(0,0,0,.15); }
+.auth-card h2 { text-align:center; margin-bottom:24px; }
+.auth-card .switch { text-align:center; margin-top:16px; font-size:13px; color:var(--text2); }
+.auth-card .switch a { color:var(--primary); cursor:pointer; text-decoration:none; font-weight:600; }
+.role-badge { display:inline-block; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:700; }
+.role-admin { background:#fee2e2; color:#991b1b; }
+.role-operator { background:#fef3c7; color:#92400e; }
+.role-user { background:#dbeafe; color:#1e40af; }
+</style>
+</head>
+<body id="appBody">
+
+<!-- 未登录：登录/注册页 -->
+<div id="authShell" style="display:flex; width:100%;">
+<div class="auth-page" style="width:100%;" id="loginPage">
+  <div class="auth-card">
+    <h2>电影推荐系统 - 登录</h2>
+    <div class="form-group"><label>用户名</label><input type="text" id="loginUser" placeholder=""></div>
+    <div class="form-group"><label>密码</label><input type="password" id="loginPass" placeholder=""></div>
+    <button class="btn btn-primary" style="width:100%;" onclick="doLogin()">登 录</button>
+    <div class="switch">还没有账号？<a onclick="showRegister()">立即注册</a></div>
+  </div>
+</div>
+
+<div class="auth-page" style="width:100%; display:none;" id="registerPage">
+  <div class="auth-card">
+    <h2>注册新用户</h2>
+    <div class="form-group"><label>用户名</label><input type="text" id="regUser" placeholder="输入用户名"></div>
+    <div class="form-group"><label>密码</label><input type="password" id="regPass" placeholder="至少6位"></div>
+    <div class="form-group"><label>确认密码</label><input type="password" id="regPass2" placeholder="再次输入密码"></div>
+    <button class="btn btn-primary" style="width:100%;" onclick="doRegister()">注 册</button>
+    <div class="switch">已有账号？<a onclick="showLogin()">返回登录</a></div>
+  </div>
+</div>
+</div>
+
+<!-- 已登录：侧边栏+主内容 -->
+<div id="appShell" style="display:none;">
+<aside class="sidebar">
+  <h1>&#9733; 电影推荐控制台</h1>
+  <div class="user-info">当前用户<strong id="sidebarUser">-</strong><span id="sidebarRole">-</span></div>
+  <nav>
+    <a href="#recommend" class="active" data-page="recommend">&#9679; 推荐探索</a>
+    <a href="#strategy" data-page="strategy" class="needs-role" data-roles="admin,operator">&#9879; 策略配置</a>
+    <a href="#dashboard" data-page="dashboard" class="needs-role" data-roles="admin,operator">&#9776; 效果看板</a>
+    <a href="#monitor" data-page="monitor" class="needs-role" data-roles="admin,operator">&#9881; 系统监控</a>
+    <a href="#users" data-page="users" class="needs-role" data-roles="admin">&#9733; 用户管理</a>
+  </nav>
+  <button class="logout-btn" onclick="doLogout()">退出登录</button>
+</aside>
+<main class="main" id="mainContent">
+
+<!-- 推荐探索 -->
+<section class="page active" id="page-recommend">
+  <h2>电影推荐探索</h2>
+  <div class="card mb">
+    <div class="flex">
+      <div class="form-group" style="flex:1; margin:0;"><label>用户 ID</label><input type="text" id="recUserId" value="1"></div>
+      <div class="form-group" style="width:100px; margin:0;"><label>数量</label><select id="recCount"><option>5</option><option selected>10</option><option>20</option></select></div>
+      <button class="btn btn-primary" onclick="fetchRecommendations()" style="margin-top:20px;">获取推荐</button>
+    </div>
+  </div>
+  <div id="recResults"><div class="empty">输入用户ID后点击"获取推荐"</div></div>
+</section>
+
+<!-- 策略配置 -->
+<section class="page" id="page-strategy">
+  <h2>策略配置</h2>
+  <div class="card" id="strategyEditor">
+    <div class="form-group"><label>策略名称</label><input type="text" id="strategyName" value="default"></div>
+    <div class="cards" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="card"><div class="form-group"><label>MMR Lambda</label><input type="number" id="mmrLambda" step="0.05" min="0" max="1" value="0.7"></div></div>
+      <div class="card"><div class="form-group"><label>多样性权重</label><input type="number" id="diversityWeight" step="0.05" min="0" max="1" value="0.15"></div></div>
+      <div class="card"><div class="form-group"><label>探索比例</label><input type="number" id="exploreRatio" step="0.05" min="0" max="1" value="0.1"></div></div>
+    </div>
+    <div class="cards" style="grid-template-columns:1fr 1fr;">
+      <div class="card"><div class="form-group"><label>负反馈惩罚</label><input type="number" id="negPenalty" step="0.1" min="0" max="1" value="0.5"></div></div>
+      <div class="card"><div class="form-group"><label>类别多样性权重</label><input type="number" id="catDivWeight" step="0.05" min="0" max="1" value="0.15"></div></div>
+    </div>
+    <div class="flex" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveStrategy()">保存策略</button>
+      <button class="btn btn-outline" onclick="loadStrategy()">重置</button>
+    </div>
+  </div>
+</section>
+
+<!-- 效果看板 -->
+<section class="page" id="page-dashboard">
+  <h2>效果看板</h2>
+  <div class="cards" id="metricCards">
+    <div class="card"><h3>总请求数</h3><div class="value blue" id="mTotal">-</div></div>
+    <div class="card"><h3>冷启动率</h3><div class="value" id="mCold">-</div></div>
+    <div class="card"><h3>P50 延迟</h3><div class="value green" id="mP50">-</div></div>
+    <div class="card"><h3>P95 延迟</h3><div class="value" id="mP95">-</div></div>
+    <div class="card"><h3>P99 延迟</h3><div class="value" id="mP99">-</div></div>
+    <div class="card"><h3>平均延迟</h3><div class="value green" id="mAvg">-</div></div>
+    <div class="card"><h3>错误数</h3><div class="value" id="mErr">-</div></div>
+  </div>
+  <button class="btn btn-outline btn-sm mb" onclick="loadMetrics()">刷新</button>
+</section>
+
+<!-- 系统监控 -->
+<section class="page" id="page-monitor">
+  <h2>系统监控</h2>
+  <div class="cards" id="monitorCards">
+    <div class="card"><h3>API 状态</h3><div class="value green" id="mApiStatus">-</div></div>
+    <div class="card"><h3>模型加载</h3><div class="value" id="mModelLoaded">-</div></div>
+    <div class="card"><h3>FAISS 索引</h3><div class="value" id="mIndexLoaded">-</div></div>
+  </div>
+  <div class="card mb">
+    <h3>系统日志 <span style="font-weight:400;font-size:11px;color:var(--text2)">(实时)</span></h3>
+    <div style="max-height:260px; overflow-y:auto; margin-top:10px;" id="logPanel">
+      <div class="log-line info">[INFO] 等待事件...</div>
+    </div>
+  </div>
+</section>
+
+<!-- 用户管理 (admin only) -->
+<section class="page" id="page-users">
+  <h2>用户管理</h2>
+  <div class="card">
+    <div class="flex-between mb">
+      <strong>所有用户</strong>
+      <button class="btn btn-outline btn-sm" onclick="loadUserList()">刷新</button>
+    </div>
+    <table id="userTable">
+      <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="userTbody"><tr><td colspan="4" class="empty">加载中...</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div id="toast" class="toast" style="display:none;"></div>
+
+<script>
+let token = localStorage.getItem('token') || '';
+let currentUser = null;
+let currentUserRole = '';
+let currentPage = 'recommend';
+
+// ── Auth pages ──
+function showRegister() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('registerPage').style.display = 'flex';
+}
+function showLogin() {
+  document.getElementById('registerPage').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+}
+
+async function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  if (!u || !p) { toast('请填写用户名和密码','error'); return; }
+  const r = await api('/auth/login', { method:'POST', body: JSON.stringify({username:u, password:p}), auth:false });
+  if (!r || r.status !== 'ok') return;
+  token = r.token; currentUser = r.username; currentUserRole = r.role;
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', r.username);
+  localStorage.setItem('role', r.role);
+  enterApp();
+}
+
+async function doRegister() {
+  const u = document.getElementById('regUser').value.trim();
+  const p1 = document.getElementById('regPass').value;
+  const p2 = document.getElementById('regPass2').value;
+  if (!u || !p1) { toast('请填写用户名和密码','error'); return; }
+  if (p1.length < 6) { toast('密码至少6位','error'); return; }
+  if (p1 !== p2) { toast('两次密码不一致','error'); return; }
+  const r = await api('/auth/register', { method:'POST', body: JSON.stringify({username:u, password:p1}), auth:false });
+  if (!r || r.status !== 'ok') return;
+  toast('注册成功！您的角色为普通用户，升级为运营或管理员请联系管理员审核。','success');
+  document.getElementById('loginUser').value = u;
+  showLogin();
+}
+
+async function doLogout() {
+  await api('/auth/logout', { method:'POST', auth:true });
+  token = ''; currentUser = null; currentUserRole = '';
+  localStorage.clear();
+  document.getElementById('authShell').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+  showLogin();
+}
+
+// ── App shell ──
+function enterApp() {
+  document.getElementById('authShell').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+  document.getElementById('sidebarUser').textContent = currentUser;
+  const rmap = { admin:'系统管理员', operator:'平台运营', user:'普通用户' };
+  document.getElementById('sidebarRole').textContent = rmap[currentUserRole] || currentUserRole;
+  document.querySelectorAll('.needs-role').forEach(a => {
+    const roles = (a.dataset.roles || '').split(',');
+    a.style.display = roles.includes(currentUserRole) ? '' : 'none';
+  });
+  switchPage('recommend');
+  loadMetrics();
+  loadHealth();
+}
+
+function switchPage(name) {
+  currentPage = name;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+  const pg = document.getElementById('page-' + name);
+  if (pg) pg.classList.add('active');
+  const nav = document.querySelector('[data-page="' + name + '"]');
+  if (nav) nav.classList.add('active');
+  if (name === 'dashboard') loadMetrics();
+  if (name === 'monitor') loadHealth();
+  if (name === 'strategy') loadStrategy();
+  if (name === 'users') loadUserList();
+}
+
+// ── Toast ──
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// ── API ──
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  const needAuth = opts.auth !== false;
+  if (needAuth) {
+    if (!token) token = localStorage.getItem('token') || '';
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  }
+  delete opts.auth;
+  try {
+    const res = await fetch(path, { headers, ...opts });
+    if (res.status === 401) { toast('请先登录','error'); doLogout(); return null; }
+    if (res.status === 403) { toast('权限不足','error'); return null; }
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      toast(e.detail || '请求失败','error'); return null;
+    }
+    return await res.json();
+  } catch (e) {
+    toast('网络错误: ' + e.message,'error'); return null;
+  }
+}
+
+// ── Recommend ──
+async function fetchRecommendations() {
+  const uid = document.getElementById('recUserId').value.trim();
+  const count = document.getElementById('recCount').value;
+  if (!uid) { toast('请输入用户ID','error'); return; }
+  document.getElementById('recResults').innerHTML = '<div class="empty"><span class="spinner"></span> 获取中...</div>';
+  const data = await api('/recommend?user_id=' + uid + '&k=' + count);
+  if (!data || !data.items || !data.items.length) {
+    document.getElementById('recResults').innerHTML = '<div class="empty">无推荐结果（请确保已运行 ml100k 训练脚本）</div>'; return;
+  }
+  const colors = ['#6366f1','#8b5cf6','#ec4899','#f43f5e','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#a855f7'];
+  document.getElementById('recResults').innerHTML = data.items.map((item,i) =>
+    '<div class="rec-card">' +
+      '<div class="rank" style="background:' + colors[i%10] + '">' + (i+1) + '</div>' +
+      '<div class="info"><div class="title">' + (item.item_id||'?') + '</div><div class="meta">' + (item.category||'') + ' · ' + (item.reason||'') + '</div></div>' +
+      '<div class="score">' + (item.score?item.score.toFixed(4):'-') + '</div>' +
+      '<button class="btn btn-sm btn-outline" onclick="sendFB(\''+uid+'\',\''+item.item_id+'\',\'click\',\''+(item.category||'')+'\')">&#10003;</button>' +
+      '<button class="btn btn-sm btn-danger" onclick="sendFB(\''+uid+'\',\''+item.item_id+'\',\'dislike\',\''+(item.category||'')+'\')">&#10007;</button>' +
+    '</div>'
+  ).join('') + (data.latency_ms ? '<div style="text-align:right;color:var(--text2);font-size:11px;margin-top:8px;">延迟 '+data.latency_ms.toFixed(1)+'ms</div>' : '');
+}
+
+async function sendFB(uid,iid,action,cat) {
+  const r = await api('/feedback', { method:'POST', body: JSON.stringify({user_id:uid, item_id:iid, feedback_type:action, category:cat||''}) });
+  if (r && r.status==='ok') toast('反馈: '+action, 'success');
+}
+
+// ── Strategy ──
+async function loadStrategy() {
+  const data = await api('/admin/strategy?strategy_id=default');
+  if (!data) return;
+  document.getElementById('strategyName').value = 'default';
+  document.getElementById('mmrLambda').value = data.mmr_lambda ?? 0.7;
+  document.getElementById('diversityWeight').value = data.diversity_weight ?? 0.15;
+  document.getElementById('exploreRatio').value = data.explore_ratio ?? 0.1;
+  document.getElementById('negPenalty').value = data.negative_penalty ?? 0.5;
+  document.getElementById('catDivWeight').value = data.category_diversity_weight ?? 0.15;
+}
+
+async function saveStrategy() {
+  const cfg = {
+    mmr_lambda: parseFloat(document.getElementById('mmrLambda').value),
+    diversity_weight: parseFloat(document.getElementById('diversityWeight').value),
+    explore_ratio: parseFloat(document.getElementById('exploreRatio').value),
+    negative_penalty: parseFloat(document.getElementById('negPenalty').value),
+    category_diversity_weight: parseFloat(document.getElementById('catDivWeight').value),
+  };
+  const r = await api('/admin/strategy?strategy_id=default', { method:'POST', body: JSON.stringify(cfg) });
+  if (r && r.status==='ok') toast('策略已保存', 'success');
+}
+
+// ── Metrics ──
+async function loadMetrics() {
+  const data = await api('/metrics/summary');
+  if (!data) return;
+  document.getElementById('mTotal').textContent = data.total_requests ?? 0;
+  document.getElementById('mCold').textContent = ((data.cold_start_ratio??0)*100).toFixed(1)+'%';
+  document.getElementById('mP50').textContent = (data.latency_p50_ms??0).toFixed(1)+'ms';
+  document.getElementById('mP95').textContent = (data.latency_p95_ms??0).toFixed(1)+'ms';
+  document.getElementById('mP99').textContent = (data.latency_p99_ms??0).toFixed(1)+'ms';
+  document.getElementById('mAvg').textContent = (data.avg_latency_ms??0).toFixed(1)+'ms';
+  document.getElementById('mErr').textContent = data.errors ?? 0;
+}
+
+// ── Monitor ──
+async function loadHealth() {
+  const data = await api('/health', {auth:false});
+  if (!data) { document.getElementById('mApiStatus').textContent='离线'; document.getElementById('mApiStatus').className='value red'; return; }
+  document.getElementById('mApiStatus').textContent = data.status==='ok'?'运行中':'异常';
+  document.getElementById('mApiStatus').className = 'value ' + (data.status==='ok'?'green':'red');
+  document.getElementById('mModelLoaded').textContent = data.model_available?'已加载':'未加载';
+  document.getElementById('mModelLoaded').className = 'value ' + (data.model_available?'green':'red');
+  document.getElementById('mIndexLoaded').textContent = data.index_available?'已加载':'未加载';
+  document.getElementById('mIndexLoaded').className = 'value ' + (data.index_available?'green':'red');
+  addLog('健康检查: ' + (data.status==='ok'?'正常':'异常'), data.status==='ok'?'info':'error');
+}
+
+function addLog(msg, level) {
+  const p = document.getElementById('logPanel');
+  if (!p) return;
+  const d = document.createElement('div');
+  d.className = 'log-line ' + (level||'info');
+  d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  p.insertBefore(d, p.firstChild);
+  if (p.children.length > 80) p.lastElementChild?.remove();
+}
+
+// ── User management ──
+async function loadUserList() {
+  if (currentUserRole !== 'admin') return;
+  const data = await api('/auth/users');
+  if (!data || !data.users) return;
+  const rmap = { admin:'<span class="role-badge role-admin">系统管理员</span>', operator:'<span class="role-badge role-operator">平台运营</span>', user:'<span class="role-badge role-user">普通用户</span>' };
+  document.getElementById('userTbody').innerHTML = data.users.map(u =>
+    '<tr>' +
+      '<td><strong>' + u.username + '</strong></td>' +
+      '<td>' + (rmap[u.role] || u.role) + '</td>' +
+      '<td>' + (u.approved ? '<span class="badge badge-green">正常</span>' : '<span class="badge badge-yellow">待审核</span>') + '</td>' +
+      '<td>' +
+        (u.role !== 'admin' ? '<button class="btn btn-sm btn-success" onclick="promoteUser(\''+u.username+'\',\'operator\')">升运营</button> ' : '') +
+        (u.role !== 'admin' ? '<button class="btn btn-sm btn-primary" onclick="promoteUser(\''+u.username+'\',\'admin\')">升管理员</button> ' : '') +
+        (u.role !== 'user' ? '<button class="btn btn-sm btn-outline" onclick="promoteUser(\''+u.username+'\',\'user\')">降用户</button> ' : '') +
+        (u.role !== 'admin' ? '<button class="btn btn-sm btn-danger" onclick="deleteUser(\''+u.username+'\')">删除</button>' : '') +
+      '</td>' +
+    '</tr>'
+  ).join('');
+}
+
+async function promoteUser(username, role) {
+  if (!confirm('确认将 ' + username + ' 的角色改为 ' + role + '？')) return;
+  const r = await api('/auth/approve', { method:'POST', body: JSON.stringify({username, role}) });
+  if (r && r.status==='ok') { toast('角色已更新为 ' + role, 'success'); loadUserList(); }
+}
+
+async function deleteUser(username) {
+  if (!confirm('确认删除用户 ' + username + '？此操作不可撤销。')) return;
+  const r = await api('/auth/users/' + username, { method:'DELETE' });
+  if (r && r.status==='ok') { toast('已删除', 'success'); loadUserList(); }
+}
+
+// ── Init ──
+document.querySelectorAll('.sidebar nav a').forEach(a => {
+  a.addEventListener('click', e => { e.preventDefault(); switchPage(a.dataset.page); });
+});
+
+if (token) {
+  api('/auth/me').then(r => {
+    if (r && r.username) {
+      currentUser = r.username; currentUserRole = r.role;
+      enterApp();
+    } else {
+      token = ''; localStorage.clear();
+      document.getElementById('authShell').style.display = 'flex';
+    }
+  });
+} else {
+  document.getElementById('authShell').style.display = 'flex';
+}
+
+setInterval(loadHealth, 15000);
+</script>
+</body>
+</html>

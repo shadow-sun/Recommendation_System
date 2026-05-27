@@ -36,6 +36,8 @@ class FeatureConfig:
 
 @dataclass
 class ModelConfig:
+    ml100k_training_route: str = "two_tower_pointwise"
+    kualive_training_route: str = "lightgcn"
     embedding_dim: int = 32
     category_embedding_dim: int = 8
     hidden_units: List[int] = field(default_factory=lambda: [64, 32])

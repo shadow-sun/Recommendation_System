@@ -1,10 +1,16 @@
-"""Lightweight event consumer: reads from queue and updates Redis feature store."""
+"""Lightweight event consumer: reads from queue and updates Redis feature store.
+
+Works with both in-memory EventQueue and Kafka-backed queues.
+"""
 import json
+import logging
 import threading
 import time
 from typing import Optional
 
-from src.streaming.producer import EventQueue, get_event_queue
+from src.streaming.producer import get_event_queue
+
+logger = logging.getLogger(__name__)
 
 
 class RedisFeatureUpdater:
@@ -98,14 +104,14 @@ class RedisFeatureUpdater:
 
 
 class EventConsumer:
-    """Consumes behavior events from the queue and updates the feature store."""
+    """Consumes behavior events from the queue (in-memory or Kafka)."""
 
     def __init__(
         self,
-        queue: Optional[EventQueue] = None,
+        queue=None,
         updater: Optional[RedisFeatureUpdater] = None,
     ):
-        self.queue = queue or get_event_queue()
+        self.queue = queue if queue is not None else get_event_queue()
         self.updater = updater or RedisFeatureUpdater()
         self.running = False
         self._thread: Optional[threading.Thread] = None

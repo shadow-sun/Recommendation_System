@@ -34,7 +34,7 @@ class RecallService:
         self.top_k = config.recall.top_k
 
     def _user_source(self, user_id: str) -> str:
-        return "kualive" if user_id.startswith("kuai_") else "ml-100k"
+        return "ml-100k"
 
     def recall(
         self,

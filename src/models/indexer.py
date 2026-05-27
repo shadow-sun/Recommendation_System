@@ -1,6 +1,8 @@
 """Faiss index builder and searcher for item embeddings."""
 import json
 import pickle
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -108,7 +110,15 @@ class FaissIndexer:
     def save(self, path: Path) -> None:
         """Save index and metadata to disk."""
         path.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(self.index, str(path / "faiss.index"))
+        index_path = path / "faiss.index"
+        with tempfile.NamedTemporaryFile(suffix=".index", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            faiss.write_index(self.index, str(tmp_path))
+            shutil.move(str(tmp_path), str(index_path))
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
         np.save(path / "embeddings.npy", self.embeddings)
         with open(path / "item_ids.json", "w") as f:
             json.dump(self.item_ids, f)
@@ -117,7 +127,15 @@ class FaissIndexer:
 
     def load(self, path: Path) -> "FaissIndexer":
         """Load index and metadata from disk."""
-        self.index = faiss.read_index(str(path / "faiss.index"))
+        index_path = path / "faiss.index"
+        with tempfile.NamedTemporaryFile(suffix=".index", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            shutil.copyfile(index_path, tmp_path)
+            self.index = faiss.read_index(str(tmp_path))
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
         if hasattr(self.index, "nprobe"):
             self.index.nprobe = config.recall.faiss_nprobe
         self.embeddings = np.load(path / "embeddings.npy")

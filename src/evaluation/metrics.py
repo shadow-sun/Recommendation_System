@@ -31,6 +31,34 @@ def precision_at_k(
     return len(hits) / k
 
 
+def hit_rate_at_k(
+    recommended: List[str],
+    relevant: List[str],
+    k: int,
+) -> float:
+    """HitRate@K: whether top-K recommendations contain any relevant item."""
+    if not relevant:
+        return 0.0
+    top_k = set(recommended[:k])
+    return 1.0 if top_k & set(relevant) else 0.0
+
+
+def diversity_at_k(
+    recommended: List[str],
+    item_categories: Dict[str, str],
+    k: int,
+) -> float:
+    """Category diversity@K: unique categories divided by returned top-K items."""
+    top_k = recommended[:k]
+    if not top_k:
+        return 0.0
+    categories = [item_categories.get(item, "") for item in top_k]
+    categories = [category for category in categories if category]
+    if not categories:
+        return 0.0
+    return len(set(categories)) / len(categories)
+
+
 def ndcg_at_k(
     recommended: List[str],
     relevant: List[str],
@@ -111,18 +139,31 @@ def evaluate_recommendations(
     user_recommendations: Dict[str, List[str]],
     user_relevant: Dict[str, List[str]],
     k_values: List[int] = [5, 10, 20],
+    item_categories: Optional[Dict[str, str]] = None,
 ) -> Dict[str, float]:
-    """Compute Recall@K and NDCG@K for all users."""
+    """Compute content-inclusion metrics for all users.
+
+    NDCG is intentionally omitted from default reports because the current
+    experiment objective values inclusion over rank position.
+    """
     results = {}
     for k in k_values:
         recalls = []
-        ndcgs = []
+        precisions = []
+        hit_rates = []
+        diversities = []
         for uid, recs in user_recommendations.items():
             rel = user_relevant.get(uid, [])
             recalls.append(recall_at_k(recs, rel, k))
-            ndcgs.append(ndcg_at_k(recs, rel, k))
+            precisions.append(precision_at_k(recs, rel, k))
+            hit_rates.append(hit_rate_at_k(recs, rel, k))
+            if item_categories is not None:
+                diversities.append(diversity_at_k(recs, item_categories, k))
         results[f"recall@{k}"] = float(np.mean(recalls)) if recalls else 0.0
-        results[f"ndcg@{k}"] = float(np.mean(ndcgs)) if ndcgs else 0.0
+        results[f"precision@{k}"] = float(np.mean(precisions)) if precisions else 0.0
+        results[f"hit_rate@{k}"] = float(np.mean(hit_rates)) if hit_rates else 0.0
+        if item_categories is not None:
+            results[f"diversity@{k}"] = float(np.mean(diversities)) if diversities else 0.0
     return results
 
 
