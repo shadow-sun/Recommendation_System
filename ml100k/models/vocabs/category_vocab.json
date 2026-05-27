@@ -1,0 +1,20 @@
+{
+  "<PAD>": 0,
+  "<UNK>": 1,
+  "Comedy": 2,
+  "Adventure": 3,
+  "Drama": 4,
+  "Children": 5,
+  "Action": 6,
+  "Documentary": 7,
+  "Crime": 8,
+  "Western": 9,
+  "Animation": 10,
+  "Horror": 11,
+  "Sci-Fi": 12,
+  "Mystery": 13,
+  "Thriller": 14,
+  "Film-Noir": 15,
+  "Musical": 16,
+  "Romance": 17
+}
