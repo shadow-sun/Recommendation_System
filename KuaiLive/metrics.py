@@ -82,19 +82,17 @@ def evaluate_recommendations(
 ) -> Dict[str, float]:
     results = {}
     for k in k_values:
-        recalls, precisions, hit_rates, diversities, ndcgs = [], [], [], [], []
+        recalls, precisions, hit_rates, diversities = [], [], [], []
         for uid, recs in user_recommendations.items():
             rel = user_relevant.get(uid, [])
             recalls.append(recall_at_k(recs, rel, k))
             precisions.append(precision_at_k(recs, rel, k))
             hit_rates.append(hit_rate_at_k(recs, rel, k))
-            ndcgs.append(ndcg_at_k(recs, rel, k))
             if item_categories:
                 diversities.append(diversity_at_k(recs, item_categories, k))
         results[f"recall@{k}"] = float(np.mean(recalls)) if recalls else 0.0
         results[f"precision@{k}"] = float(np.mean(precisions)) if precisions else 0.0
         results[f"hit_rate@{k}"] = float(np.mean(hit_rates)) if hit_rates else 0.0
-        results[f"ndcg@{k}"] = float(np.mean(ndcgs)) if ndcgs else 0.0
         if diversities:
             results[f"diversity@{k}"] = float(np.mean(diversities))
     return results

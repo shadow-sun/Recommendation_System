@@ -32,18 +32,19 @@ class FeatureConfig:
 
 @dataclass
 class ModelConfig:
+    default_training_route: str = "lightgcn"
     seed: int = 2026
-    embedding_dim: int = 64
+    embedding_dim: int = 128
     category_embedding_dim: int = 16
     hidden_units: List[int] = field(default_factory=lambda: [128, 64])
     deepfm_hidden_units: List[int] = field(default_factory=lambda: [128, 64, 32])
     deepfm_dropout: float = 0.2
     l2_reg: float = 1e-5
     weight_decay: float = 1e-5
-    learning_rate: float = 1e-3
-    batch_size: int = 1024
+    learning_rate: float = 5e-4
+    batch_size: int = 512
     epochs: int = 40
-    early_stopping_patience: int = 8
+    early_stopping_patience: int = 12
     optimizer: str = "adamw"
     retrieval_loss: str = "pairwise_hinge"
     temperature: float = 0.07
@@ -65,11 +66,26 @@ class ModelConfig:
     explicit_negative_weight: float = 1.0
     popularity_sampling_alpha: float = 0.75
     sampled_softmax_correction: bool = True
-    lightgcn_layers: int = 3
-    lightgcn_num_negatives: int = 4
+    lightgcn_layers: int = 4
+    lightgcn_num_negatives: int = 48
     lightgcn_reg_weight: float = 1e-6
-    lightgcn_eval_target_count: int = 1
-    lightgcn_popular_blend_weight: float = 0.15
+    lightgcn_eval_target_count: int = 3
+    lightgcn_temperature: float = 0.17
+    lightgcn_edge_dropout: float = 0.08
+    lightgcn_emb_dropout: float = 0.05
+    lightgcn_warmup_epochs: int = 2
+    lightgcn_popular_neg_alpha: float = 0.75
+    lightgcn_bpr_weight: float = 0.15
+    lightgcn_popular_blend_weight: float = 0.05
+    lightgcn_cooccurrence_blend_weight: float = 0.60
+    lightgcn_cooccurrence_topn: int = 200
+    lightgcn_cooccurrence_window: int = 20
+    lightgcn_recent_history_weight: float = 0.85
+    lightgcn_transition_blend_weight: float = 0.25
+    lightgcn_transition_topn: int = 200
+    lightgcn_category_blend_weight: float = 0.05
+    lightgcn_diversify_top_k: int = 20
+    lightgcn_max_same_category_in_top_k: int = 4
 
 
 @dataclass
@@ -87,6 +103,17 @@ class RankConfig:
     explore_ratio: float = 0.1
     negative_penalty: float = 0.5
     category_diversity_weight: float = 0.15
+
+
+@dataclass
+class KafkaConfig:
+    enabled: bool = True
+    bootstrap_servers: str = "localhost:9092"
+    topic: str = "kuailive_events"
+    consumer_group: str = "kuailive_consumer"
+    max_poll_records: int = 500
+    session_timeout_ms: int = 30000
+    auto_offset_reset: str = "latest"
 
 
 @dataclass
@@ -116,6 +143,7 @@ class Config:
     recall: RecallConfig = field(default_factory=RecallConfig)
     rank: RankConfig = field(default_factory=RankConfig)
     serving: ServingConfig = field(default_factory=ServingConfig)
+    kafka: KafkaConfig = field(default_factory=KafkaConfig)
     simulation: SimulationConfig = field(default_factory=SimulationConfig)
     model_dir: Path = ROOT / "models"
     device: str = "cpu"

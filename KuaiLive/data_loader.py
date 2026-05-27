@@ -163,12 +163,12 @@ def load_kuailive() -> pd.DataFrame:
 
     df = df[["user_id", "item_id", "timestamp", "behavior_type", "label", "category"]]
 
-    pop = df.groupby("item_id").size().rename("popularity")
-    avg = df.groupby("item_id")["label"].mean().rename("avg_rating")
-    cnt = df.groupby("item_id")["label"].count().rename("num_ratings")
-    df = df.join(pop, on="item_id")
-    df = df.join(avg, on="item_id")
-    df = df.join(cnt, on="item_id")
+    pop = df.groupby("item_id").size().to_dict()
+    avg = df.groupby("item_id")["label"].mean().to_dict()
+    cnt = df.groupby("item_id")["label"].count().to_dict()
+    df["popularity"] = df["item_id"].map(pop)
+    df["avg_rating"] = df["item_id"].map(avg)
+    df["num_ratings"] = df["item_id"].map(cnt)
 
     df = _filter_cold_start(df)
     print(f"  After cold-start filter: {len(df)} interactions, "

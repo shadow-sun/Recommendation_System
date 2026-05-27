@@ -1,0 +1,23 @@
+{
+  "admin": {
+    "username": "admin",
+    "password_hash": "f249f4dab91aaf90b48d7e3e773537d6ed3c2cd4b0b593598c4fcc63acb6a196",
+    "salt": "0371e181f34f7dda950e2e26234b8e06",
+    "role": "admin",
+    "approved": true
+  },
+  "operator": {
+    "username": "operator",
+    "password_hash": "eeb59b5feb0ca60961f5537d2fa9a71dc4ba9afb38136f55790801eaf4868fac",
+    "salt": "b6223b9d6335db059773bd191ccff602",
+    "role": "operator",
+    "approved": true
+  },
+  "user": {
+    "username": "user",
+    "password_hash": "2fbc037eb19b841590aae806b30e2c74c00ac8ec7cc347466bc1900cbc9f7237",
+    "salt": "092842971f7e6247d84c9570a0ae8927",
+    "role": "user",
+    "approved": true
+  }
+}
