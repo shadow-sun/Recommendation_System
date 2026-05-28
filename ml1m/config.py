@@ -70,9 +70,33 @@ class RankConfig:
 
 
 @dataclass
+class KafkaConfig:
+    enabled: bool = True
+    bootstrap_servers: str = "localhost:9092"
+    topic: str = "ml1m_events"
+    consumer_group: str = "ml1m_consumer"
+    max_poll_records: int = 500
+    session_timeout_ms: int = 30000
+    auto_offset_reset: str = "latest"
+
+
+@dataclass
 class ServingConfig:
     host: str = "0.0.0.0"
     port: int = 3006
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    cache_ttl: int = 3600
+
+
+@dataclass
+class SimulationConfig:
+    n_users: int = 100
+    n_rounds: int = 5
+    click_prob: float = 0.3
+    neg_feedback_prob: float = 0.05
+    feedback_categories: List[str] = field(default_factory=lambda: ["not_interested", "bad_quality"])
 
 
 @dataclass
@@ -82,7 +106,9 @@ class Config:
     model: ModelConfig = field(default_factory=ModelConfig)
     recall: RecallConfig = field(default_factory=RecallConfig)
     rank: RankConfig = field(default_factory=RankConfig)
+    kafka: KafkaConfig = field(default_factory=KafkaConfig)
     serving: ServingConfig = field(default_factory=ServingConfig)
+    simulation: SimulationConfig = field(default_factory=SimulationConfig)
     model_dir: Path = ROOT / "models"
     device: str = "cuda" if _torch.cuda.is_available() else "cpu"
 

@@ -1,5 +1,6 @@
-"""FastAPI recommendation gateway for the ml-1m subsystem."""
+"""FastAPI recommendation gateway for the ml-1m subsystem (Kafka-enabled)."""
 import json
+import logging
 import os
 import time
 import uuid
@@ -20,11 +21,16 @@ from ml100k.two_tower import TwoTowerModel
 from .config import config
 from .data_loader import load_items, load_ratings, load_users
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+logger = logging.getLogger("ml1m.gateway")
+
 app = FastAPI(
     title="MovieLens 1M Recommendation System",
     description="Two-Tower Recall + MMR Rerank for MovieLens 1M",
     version="1.0.0",
 )
+
+# ── Core services ────────────────────────────────────────────────────────────
 
 feature_store: FeatureStore = FeatureStore()
 two_tower_model = None
@@ -39,6 +45,12 @@ item_metadata: Dict[str, Dict[str, str]] = {}
 item_categories: Dict[str, str] = {}
 reranker: MMRReranker = MMRReranker()
 
+# ── Kafka / streaming ────────────────────────────────────────────────────────
+
+_event_queue = None
+_event_consumer = None
+_kafka_available = False
+
 request_stats: Dict[str, int] = {
     "total": 0,
     "success": 0,
@@ -48,6 +60,7 @@ request_stats: Dict[str, int] = {
     "client_errors": 0,
     "server_errors": 0,
     "feedback": 0,
+    "kafka_events": 0,
 }
 latency_samples: List[float] = []
 
@@ -82,6 +95,8 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+
+# ── helpers ──────────────────────────────────────────────────────────────────
 
 def _load_vocab(name: str) -> dict:
     suffix = os.getenv("ML1M_MODEL_SUFFIX", "")
@@ -271,6 +286,64 @@ def _ensure_model_artifacts() -> None:
             faiss_indexer = idx
 
 
+# ── Kafka / streaming setup ──────────────────────────────────────────────────
+
+def _init_kafka():
+    """Initialize Kafka event queue and streaming consumer."""
+    global _event_queue, _event_consumer, _kafka_available
+
+    bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", config.kafka.bootstrap_servers)
+    topic = os.getenv("KAFKA_TOPIC", config.kafka.topic)
+
+    if not config.kafka.enabled:
+        logger.info("Kafka disabled in config — using in-memory queue")
+    else:
+        try:
+            from .kafka_bridge import KafkaEventQueue, _check_kafka_connection
+
+            if _check_kafka_connection(bootstrap):
+                _event_queue = KafkaEventQueue(
+                    bootstrap_servers=bootstrap,
+                    topic=topic,
+                    consumer_group=config.kafka.consumer_group,
+                )
+                _kafka_available = True
+                logger.info("Kafka connected: %s [topic=%s]", bootstrap, topic)
+            else:
+                logger.warning("Kafka broker unreachable at %s, falling back to in-memory queue", bootstrap)
+        except ImportError:
+            logger.warning("kafka-python not installed, using in-memory queue")
+        except Exception:
+            logger.exception("Kafka init failed, using in-memory queue")
+
+    if _event_queue is None:
+        from .streaming_producer import EventQueue
+        _event_queue = EventQueue()
+        logger.info("Using in-memory event queue")
+
+    # Start consumer thread to process events into feature_store
+    from .streaming_consumer import EventConsumer, RedisFeatureUpdater
+
+    updater = RedisFeatureUpdater()
+    _event_consumer = EventConsumer(queue=_event_queue, updater=updater)
+    _event_consumer.start()
+    logger.info("Event consumer started")
+
+
+def _shutdown_kafka():
+    """Gracefully shut down Kafka consumer and producer."""
+    global _event_consumer, _event_queue
+    if _event_consumer is not None:
+        _event_consumer.stop()
+        logger.info("Event consumer stopped (processed=%d, errors=%d)",
+                     _event_consumer.stats["processed"], _event_consumer.stats["errors"])
+    if _event_queue is not None and hasattr(_event_queue, "close"):
+        _event_queue.close()
+        logger.info("Event queue closed")
+
+
+# ── Lifecycle ────────────────────────────────────────────────────────────────
+
 @app.on_event("startup")
 def startup():
     global two_tower_model, faiss_indexer, user_vocab, item_vocab, category_vocab
@@ -286,6 +359,15 @@ def startup():
         loaded.append("Faiss")
     print(f"ml-1m models loaded: {', '.join(loaded) if loaded else 'none (run ml1m/scripts/train.py first)'}")
 
+    _init_kafka()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    _shutdown_kafka()
+
+
+# ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def index():
@@ -299,6 +381,8 @@ def index():
 def health():
     _ensure_serving_data()
     _ensure_model_artifacts()
+    consumer_stats = _event_consumer.stats if _event_consumer else {}
+    queue_size = _event_queue.size() if _event_queue else 0
     return {
         "status": "ok",
         "dataset": "ml-1m",
@@ -309,6 +393,14 @@ def health():
         "known_items": len(item_metadata),
         "user_id_min": min((int(uid) for uid in valid_user_ids if uid.isdigit()), default=None),
         "user_id_max": max((int(uid) for uid in valid_user_ids if uid.isdigit()), default=None),
+        "kafka": {
+            "enabled": config.kafka.enabled,
+            "connected": _kafka_available,
+            "topic": config.kafka.topic,
+            "queue_size": queue_size,
+            "consumer_processed": consumer_stats.get("processed", 0),
+            "consumer_errors": consumer_stats.get("errors", 0),
+        },
     }
 
 
@@ -438,36 +530,50 @@ def feedback(req: FeedbackRequest):
             status_code=400,
             detail=f"Unknown ml-1m user_id={req.user_id}. Please use a valid MovieLens 1M user ID.",
         )
+    # Write to feature store directly
     feature_store.record_feedback(req.user_id, req.item_id, req.feedback_type, req.category)
+
+    # Publish to Kafka for streaming consumers
     event = {
         "user_id": req.user_id,
         "item_id": req.item_id,
-        "feedback_type": req.feedback_type,
+        "behavior_type": req.feedback_type,
         "category": req.category,
         "timestamp": time.time(),
+        "source_dataset": "ml1m",
     }
-    feature_store.save_feedback_event(event)
+    if _event_queue is not None:
+        try:
+            _event_queue.put(event)
+            request_stats["kafka_events"] += 1
+        except Exception:
+            logger.exception("Failed to publish feedback event to queue")
+
     request_stats["feedback"] += 1
     return {"status": "ok", "message": f"Feedback recorded: {req.feedback_type}"}
 
 
 @app.get("/feedback/summary")
-def feedback_summary(limit: int = Query(20, ge=1, le=100)):
+def feedback_summary():
     penalties = {}
     if hasattr(feature_store, "_store"):
         for key, value in feature_store._store.items():
             if key.startswith("neg:"):
-                _, user_id, category = key.split(":", 2)
-                penalties.setdefault(user_id, {})[category] = float(value)
+                parts = key.split(":", 2)
+                if len(parts) >= 3:
+                    _, user_id, category = parts
+                    penalties.setdefault(user_id, {})[category] = float(value)
     return {
         "total_feedback": request_stats["feedback"],
-        "recent": feature_store.list_feedback(limit=limit),
+        "kafka_events_published": request_stats["kafka_events"],
+        "consumer_processed": _event_consumer.stats["processed"] if _event_consumer else 0,
+        "consumer_errors": _event_consumer.stats["errors"] if _event_consumer else 0,
         "negative_penalties": penalties,
     }
 
 
 @app.get("/feedback/user/{user_id}")
-def user_feedback(user_id: str, limit: int = Query(20, ge=1, le=100)):
+def user_feedback(user_id: str):
     if valid_user_ids and user_id not in valid_user_ids:
         raise HTTPException(
             status_code=400,
@@ -475,7 +581,6 @@ def user_feedback(user_id: str, limit: int = Query(20, ge=1, le=100)):
         )
     return {
         "user_id": user_id,
-        "recent": feature_store.list_user_feedback(user_id, limit=limit),
         "negative_penalties": feature_store.get_negative_penalties(user_id),
         "recent_items": feature_store.get_user_recent_items(user_id),
     }
@@ -491,6 +596,7 @@ def metrics_summary():
         p99 = sorted_lat[int(len(sorted_lat) * 0.99)]
     else:
         p50 = p95 = p99 = 0
+    consumer_stats = _event_consumer.stats if _event_consumer else {}
     return {
         "total_requests": request_stats["total"],
         "successful_requests": request_stats["success"],
@@ -503,6 +609,11 @@ def metrics_summary():
         "server_errors": request_stats["server_errors"],
         "errors": request_stats["client_errors"] + request_stats["server_errors"],
         "feedback_count": request_stats["feedback"],
+        "kafka_events": request_stats["kafka_events"],
+        "kafka_connected": _kafka_available,
+        "consumer_processed": consumer_stats.get("processed", 0),
+        "consumer_errors": consumer_stats.get("errors", 0),
+        "queue_pending": _event_queue.size() if _event_queue else 0,
         "latency_p50_ms": round(p50, 2),
         "latency_p95_ms": round(p95, 2),
         "latency_p99_ms": round(p99, 2),
@@ -523,3 +634,7 @@ def get_strategy(strategy_id: str = "default"):
 
 def run_gateway(host="0.0.0.0", port=3006):
     uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    run_gateway()
