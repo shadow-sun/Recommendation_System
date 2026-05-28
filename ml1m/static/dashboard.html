@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MovieLens 1M 推荐</title>
+<style>
+:root {
+  --bg: #eef2f7; --panel: #fff; --nav: #172033; --primary: #4f46e5;
+  --primary-soft: #eef2ff; --text: #182235; --muted: #667085;
+  --border: #d9e1ec; --success: #16a34a; --danger: #dc2626;
+  --warning: #d97706; --shadow: 0 10px 28px rgba(15, 23, 42, .08);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+button, input, select { font: inherit; }
+.sidebar { position: fixed; inset: 0 auto 0 0; width: 248px; padding: 24px 0; background: var(--nav); color: #fff; }
+.brand { padding: 0 22px 22px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.brand h1 { margin: 0 0 8px; font-size: 17px; line-height: 1.35; }
+.brand p { margin: 0; color: rgba(255,255,255,.62); font-size: 12px; }
+.nav a { display: flex; gap: 10px; padding: 13px 22px; color: rgba(255,255,255,.68); text-decoration: none; border-left: 3px solid transparent; font-size: 14px; }
+.nav a:hover, .nav a.active { color: #fff; background: rgba(255,255,255,.07); border-left-color: var(--primary); }
+.main { margin-left: 248px; width: calc(100% - 248px); padding: 28px 32px 44px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.topbar h2 { margin: 0; font-size: 22px; }
+.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 99px; background: var(--warning); }
+.dot.ok { background: var(--success); }
+.page { display: none; }
+.page.active { display: block; }
+.grid { display: grid; gap: 16px; }
+.grid.two { grid-template-columns: minmax(320px, 420px) 1fr; align-items: start; }
+.cards { grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 18px; }
+.card h3 { margin: 0 0 12px; font-size: 15px; }
+.metric-label { margin: 0 0 8px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.metric-value { font-size: 28px; font-weight: 750; }
+.field { margin-bottom: 14px; }
+.field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; font-weight: 650; }
+.field input, .field select { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--text); }
+.field input:focus, .field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.13); }
+.row { display: flex; gap: 12px; align-items: end; }
+.row > * { flex: 1; }
+.btn { min-height: 40px; border: 0; border-radius: 7px; padding: 9px 15px; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; }
+.btn.secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+.btn.good { background: var(--success); }
+.btn.bad { background: var(--danger); }
+.btn.small { min-height: 34px; padding: 7px 11px; font-size: 13px; }
+.results { display: grid; gap: 10px; }
+.rec { display: grid; grid-template-columns: 38px 1fr auto auto auto; gap: 12px; align-items: center; padding: 13px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.rank { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-weight: 800; }
+.title { font-weight: 750; }
+.meta { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.score { min-width: 84px; color: var(--primary); font-weight: 750; font-size: 13px; text-align: right; }
+.score span { display: block; margin-bottom: 2px; color: var(--muted); font-size: 11px; font-weight: 650; }
+.empty { padding: 38px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; background: rgba(255,255,255,.58); }
+.log { max-height: 320px; overflow: auto; border-radius: 8px; background: #101827; color: #d9e1ec; padding: 12px; font: 12px/1.7 Consolas, monospace; }
+.toast { position: fixed; right: 22px; top: 20px; display: none; max-width: 360px; padding: 12px 16px; border-radius: 8px; background: var(--nav); color: #fff; box-shadow: var(--shadow); font-size: 13px; }
+@media (max-width: 900px) {
+  body { display: block; }
+  .sidebar { position: static; width: 100%; padding: 18px 0 8px; }
+  .nav { display: flex; overflow-x: auto; }
+  .nav a { white-space: nowrap; border-left: 0; border-bottom: 3px solid transparent; }
+  .main { margin-left: 0; width: 100%; padding: 22px 16px 32px; }
+  .grid.two { grid-template-columns: 1fr; }
+  .topbar { align-items: flex-start; flex-direction: column; }
+  .rec { grid-template-columns: 38px 1fr; }
+  .rec .score, .rec button { grid-column: 2; width: max-content; }
+}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand">
+    <h1>MovieLens 1M 推荐</h1>
+    <p>普通用户可直接反馈推荐结果</p>
+  </div>
+  <nav class="nav">
+    <a href="#recommend" class="active" data-page="recommend">推荐</a>
+    <a href="#my-feedback" data-page="my-feedback">我的反馈</a>
+    <a href="#metrics" data-page="metrics">效果看板</a>
+    <a href="#admin-feedback" data-page="admin-feedback">反馈总览</a>
+    <a href="#monitor" data-page="monitor">系统监控</a>
+  </nav>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <h2 id="pageTitle">推荐</h2>
+    <span class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">检查中</span></span>
+  </div>
+
+  <section class="page active" id="page-recommend">
+    <div class="grid two">
+      <div class="card">
+        <h3>当前用户</h3>
+        <div class="field"><label for="userId">用户 ID <span id="userRangeHint"></span></label><input id="userId" value="1" inputmode="numeric"></div>
+        <div class="row">
+          <div class="field"><label for="count">数量</label><select id="count"><option>5</option><option selected>10</option><option>20</option></select></div>
+          <div class="field"><label for="strategy">策略</label><select id="strategy"><option value="default">default 模型相关</option><option value="diverse">diverse 多样性</option><option value="popular">popular 热门</option></select></div>
+        </div>
+        <div class="row">
+          <button class="btn" onclick="fetchRecommendations()">获取推荐</button>
+          <button class="btn secondary" onclick="switchPage('my-feedback')">查看我的反馈</button>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px;">
+          <h3>用户操作</h3>
+          <div class="meta">获取推荐后，可以直接在每部电影右侧点击“喜欢”或“不感兴趣”；反馈会出现在“我的反馈”页面，并影响后续推荐。</div>
+        </div>
+        <div class="results" id="results"><div class="empty">输入 MovieLens 1M 用户 ID 后获取电影推荐。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-my-feedback">
+    <div class="grid two">
+      <div class="card">
+        <h3>我的反馈影响</h3>
+        <div class="grid cards">
+          <div class="card"><p class="metric-label">近期正反馈电影</p><div class="metric-value" id="myRecentCount">-</div></div>
+          <div class="card"><p class="metric-label">负反馈类目</p><div class="metric-value" id="myPenaltyCount">-</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>我的最近反馈</h3>
+        <div id="myFeedbackList" class="results"><div class="empty">暂无反馈。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-metrics">
+    <div class="grid cards">
+      <div class="card"><p class="metric-label">总请求数</p><div class="metric-value" id="mTotal">-</div></div>
+      <div class="card"><p class="metric-label">成功请求</p><div class="metric-value" id="mSuccess">-</div></div>
+      <div class="card"><p class="metric-label">Fallback 率</p><div class="metric-value" id="mFallback">-</div></div>
+      <div class="card"><p class="metric-label">Popular 占比</p><div class="metric-value" id="mPopular">-</div></div>
+      <div class="card"><p class="metric-label">反馈数</p><div class="metric-value" id="mFeedback">-</div></div>
+      <div class="card"><p class="metric-label">P95 延迟</p><div class="metric-value" id="mP95">-</div></div>
+      <div class="card"><p class="metric-label">客户端错误</p><div class="metric-value" id="mClientErrors">-</div></div>
+      <div class="card"><p class="metric-label">服务错误</p><div class="metric-value" id="mServerErrors">-</div></div>
+    </div>
+    <p><button class="btn secondary" onclick="loadMetrics()">刷新</button></p>
+  </section>
+
+  <section class="page" id="page-admin-feedback">
+    <div class="grid two">
+      <div class="card">
+        <h3>反馈汇总</h3>
+        <div class="grid cards">
+          <div class="card"><p class="metric-label">反馈数</p><div class="metric-value" id="fTotal">-</div></div>
+          <div class="card"><p class="metric-label">负反馈用户</p><div class="metric-value" id="fUsers">-</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>最近反馈</h3>
+        <div id="feedbackList" class="results"><div class="empty">暂无反馈。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-monitor">
+    <div class="grid cards">
+      <div class="card"><p class="metric-label">API</p><div class="metric-value" id="hApi">-</div></div>
+      <div class="card"><p class="metric-label">Two-Tower</p><div class="metric-value" id="hModel">-</div></div>
+      <div class="card"><p class="metric-label">FAISS</p><div class="metric-value" id="hIndex">-</div></div>
+      <div class="card"><p class="metric-label">已知用户</p><div class="metric-value" id="hUsers">-</div></div>
+      <div class="card"><p class="metric-label">已知电影</p><div class="metric-value" id="hItems">-</div></div>
+    </div>
+    <p><button class="btn secondary" onclick="loadHealth()">刷新</button></p>
+    <div class="log" id="log">等待系统事件...</div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const pageTitles = { recommend: '推荐', 'my-feedback': '我的反馈', metrics: '效果看板', 'admin-feedback': '反馈总览', monitor: '系统监控' };
+
+function currentUserId() { return document.getElementById('userId').value.trim(); }
+function toast(message) {
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 2600);
+}
+function log(message) {
+  const el = document.getElementById('log');
+  const line = '[' + new Date().toLocaleTimeString() + '] ' + message;
+  el.textContent = el.textContent === '等待系统事件...' ? line : line + '\n' + el.textContent;
+}
+async function api(path, options = {}) {
+  const opts = { headers: { 'Content-Type': 'application/json' }, ...options };
+  const response = await fetch(path, opts);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || '请求失败');
+  }
+  return response.json();
+}
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector('[data-page="' + name + '"]').classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[name];
+  if (name === 'my-feedback') loadMyFeedback();
+  if (name === 'metrics') loadMetrics();
+  if (name === 'admin-feedback') loadFeedback();
+  if (name === 'monitor') loadHealth();
+}
+document.querySelectorAll('.nav a').forEach(link => {
+  link.addEventListener('click', event => {
+    event.preventDefault();
+    switchPage(link.dataset.page);
+  });
+});
+document.getElementById('userId').addEventListener('change', () => {
+  loadMyFeedback();
+});
+
+async function fetchRecommendations() {
+  const uid = currentUserId();
+  const k = document.getElementById('count').value;
+  const strategy = encodeURIComponent(document.getElementById('strategy').value || 'default');
+  if (!uid) return toast('请先输入用户 ID');
+  const box = document.getElementById('results');
+  box.innerHTML = '<div class="empty">正在获取推荐...</div>';
+  try {
+    const data = await api('/recommend?user_id=' + encodeURIComponent(uid) + '&k=' + k + '&strategy=' + strategy);
+    if (!data.items || data.items.length === 0) {
+      box.innerHTML = '<div class="empty">暂无推荐结果。</div>';
+      return;
+    }
+    box.innerHTML = data.items.map((item, i) => `
+      <div class="rec">
+        <div class="rank">${i + 1}</div>
+        <div><div class="title">${escapeHtml(item.title || ('电影 ' + item.item_id))}</div><div class="meta">ID ${escapeHtml(item.item_id)} · ${escapeHtml(item.category || 'MovieLens 1M')} · ${escapeHtml(item.reason || 'two_tower+mmr')}</div></div>
+        <div class="score" title="${item.raw_score !== undefined ? '原始召回分: ' + formatScore(item.raw_score) : ''}"><span>最终分</span>${formatScore(item.score)}</div>
+        <button class="btn small good" onclick="sendFeedback('${uid}', '${item.item_id}', '${escapeAttr(item.category || '')}', 'like')">喜欢</button>
+        <button class="btn small bad" onclick="sendFeedback('${uid}', '${item.item_id}', '${escapeAttr(item.category || '')}', 'not_interested')">不感兴趣</button>
+      </div>
+    `).join('');
+    log('推荐完成 user=' + uid + ', k=' + data.items.length + ', latency=' + data.latency_ms + 'ms');
+    loadMetrics();
+  } catch (err) {
+    box.innerHTML = '<div class="empty">' + escapeHtml(err.message) + '</div>';
+    toast(err.message);
+  }
+}
+
+async function sendFeedback(userId, itemId, category, feedbackType) {
+  try {
+    await api('/feedback', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, item_id: itemId, feedback_type: feedbackType, category })
+    });
+    toast(feedbackType === 'like' ? '已记录喜欢，正在刷新推荐' : '已记录不感兴趣，正在刷新推荐');
+    await fetchRecommendations();
+    await loadMyFeedback();
+    await loadFeedback();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+async function loadMetrics() {
+  try {
+    const data = await api('/metrics/summary');
+    document.getElementById('mTotal').textContent = data.total_requests ?? 0;
+    document.getElementById('mSuccess').textContent = data.successful_requests ?? 0;
+    document.getElementById('mFallback').textContent = ((data.fallback_ratio ?? 0) * 100).toFixed(1) + '%';
+    document.getElementById('mPopular').textContent = ((data.popular_ratio ?? 0) * 100).toFixed(1) + '%';
+    document.getElementById('mFeedback').textContent = data.feedback_count ?? 0;
+    document.getElementById('mP95').textContent = (data.latency_p95_ms ?? 0).toFixed(1) + 'ms';
+    document.getElementById('mClientErrors').textContent = data.client_errors ?? 0;
+    document.getElementById('mServerErrors').textContent = data.server_errors ?? 0;
+  } catch (err) {
+    toast(err.message);
+  }
+}
+async function loadMyFeedback() {
+  const uid = currentUserId();
+  if (!uid) return;
+  try {
+    const data = await api('/feedback/user/' + encodeURIComponent(uid) + '?limit=20');
+    const penalties = data.negative_penalties || {};
+    document.getElementById('myRecentCount').textContent = (data.recent_items || []).length;
+    document.getElementById('myPenaltyCount').textContent = Object.keys(penalties).length;
+    renderFeedbackList('myFeedbackList', data.recent || []);
+  } catch (err) {
+    document.getElementById('myFeedbackList').innerHTML = '<div class="empty">' + escapeHtml(err.message) + '</div>';
+  }
+}
+async function loadFeedback() {
+  try {
+    const data = await api('/feedback/summary?limit=20');
+    const penalties = data.negative_penalties || {};
+    document.getElementById('fTotal').textContent = data.total_feedback ?? 0;
+    document.getElementById('fUsers').textContent = Object.keys(penalties).length;
+    renderFeedbackList('feedbackList', data.recent || []);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+function renderFeedbackList(id, rows) {
+  const box = document.getElementById(id);
+  if (!rows.length) {
+    box.innerHTML = '<div class="empty">暂无反馈。</div>';
+    return;
+  }
+  box.innerHTML = rows.map(row => `
+    <div class="rec">
+      <div class="rank">${row.feedback_type === 'like' ? '+' : '-'}</div>
+      <div><div class="title">用户 ${escapeHtml(row.user_id)} · 电影 ${escapeHtml(row.item_id)}</div><div class="meta">${escapeHtml(row.feedback_type)} · ${escapeHtml(row.category || 'Unknown')} · ${new Date((row.timestamp || 0) * 1000).toLocaleString()}</div></div>
+    </div>
+  `).join('');
+}
+async function loadHealth() {
+  try {
+    const data = await api('/health');
+    document.getElementById('statusDot').className = 'dot ok';
+    document.getElementById('statusText').textContent = 'ml-1m API 在线';
+    document.getElementById('hApi').textContent = data.status === 'ok' ? '正常' : '异常';
+    document.getElementById('hModel').textContent = data.model_available ? '已加载' : '未加载';
+    document.getElementById('hIndex').textContent = data.index_available ? '已加载' : '未加载';
+    document.getElementById('hUsers').textContent = data.known_users ?? 0;
+    document.getElementById('hItems').textContent = data.known_items ?? 0;
+    if (data.user_id_min !== undefined && data.user_id_max !== undefined) {
+      document.getElementById('userRangeHint').textContent = `(${data.user_id_min}-${data.user_id_max})`;
+      document.getElementById('userId').min = data.user_id_min;
+      document.getElementById('userId').max = data.user_id_max;
+    }
+    log('健康检查完成：dataset=' + (data.dataset || 'ml-1m'));
+  } catch (err) {
+    document.getElementById('statusDot').className = 'dot';
+    document.getElementById('statusText').textContent = 'API 离线';
+    toast(err.message);
+  }
+}
+function formatScore(value) {
+  const score = Number(value || 0);
+  if (!Number.isFinite(score)) return '-';
+  return score.toFixed(3);
+}
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+function escapeAttr(value) {
+  return String(value ?? '').replace(/['\\]/g, '\\$&').replace(/\n/g, ' ');
+}
+
+loadHealth();
+loadMetrics();
+loadMyFeedback();
+loadFeedback();
+setInterval(loadHealth, 15000);
+</script>
+</body>
+</html>

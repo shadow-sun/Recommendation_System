@@ -1,0 +1,72 @@
+{
+  "dataset": "ml-1m",
+  "max_users": 500,
+  "holdout_users": 500,
+  "k_values": [
+    5,
+    10,
+    20
+  ],
+  "strategies": {
+    "default": {
+      "recall@5": 0.010742036779207357,
+      "recall@10": 0.019895412444699744,
+      "recall@20": 0.037186171899698715,
+      "precision@5": 0.28320000000000006,
+      "precision@10": 0.26380000000000003,
+      "precision@20": 0.24919999999999998,
+      "hit_rate@5": 0.604,
+      "hit_rate@10": 0.688,
+      "hit_rate@20": 0.754,
+      "diversity@5": 0.9388,
+      "diversity@10": 0.754,
+      "diversity@20": 0.4141,
+      "evaluated_users": 500,
+      "failures": 0,
+      "catalog_coverage@max_k": 0.3038887458150914,
+      "unique_recommended@max_k": 1180,
+      "latency_avg_ms": 2.566776999839931,
+      "latency_p95_ms": 3.340524998566252
+    },
+    "diverse": {
+      "recall@5": 0.010814574590278273,
+      "recall@10": 0.017661592077095868,
+      "recall@20": 0.03192296336461317,
+      "precision@5": 0.284,
+      "precision@10": 0.24180000000000001,
+      "precision@20": 0.2229,
+      "hit_rate@5": 0.608,
+      "hit_rate@10": 0.686,
+      "hit_rate@20": 0.754,
+      "diversity@5": 0.9947999999999999,
+      "diversity@10": 0.9498,
+      "diversity@20": 0.6147999999999999,
+      "evaluated_users": 500,
+      "failures": 0,
+      "catalog_coverage@max_k": 0.23461241308266803,
+      "unique_recommended@max_k": 911,
+      "latency_avg_ms": 1.88317920017289,
+      "latency_p95_ms": 2.576060005594626
+    },
+    "popular": {
+      "recall@5": 0.018925264106162295,
+      "recall@10": 0.033965731915323955,
+      "recall@20": 0.060366815424197126,
+      "precision@5": 0.4272,
+      "precision@10": 0.3972,
+      "precision@20": 0.3687,
+      "hit_rate@5": 0.764,
+      "hit_rate@10": 0.834,
+      "hit_rate@20": 0.874,
+      "diversity@5": 0.38200000000000006,
+      "diversity@10": 0.31939999999999996,
+      "diversity@20": 0.2734,
+      "evaluated_users": 500,
+      "failures": 0,
+      "catalog_coverage@max_k": 0.00978624774658769,
+      "unique_recommended@max_k": 38,
+      "latency_avg_ms": 1.1709843999124132,
+      "latency_p95_ms": 1.6858700000739189
+    }
+  }
+}
